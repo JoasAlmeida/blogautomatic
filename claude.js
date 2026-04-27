@@ -78,7 +78,7 @@ function validate(obj) {
     if (!obj[key]) throw new Error(`Campo ausente no JSON do Claude: ${key}`);
   }
   if (!Array.isArray(obj.tags)) throw new Error('tags deve ser array');
-  if (obj.titulo.length > 100) throw new Error('titulo muito longo');
+  if (obj.titulo.length > 80) throw new Error('titulo muito longo (max 80 chars)');
 }
 
 function stripHtml(html) {

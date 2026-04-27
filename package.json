@@ -3,19 +3,16 @@
   "version": "1.0.0",
   "description": "Bot que le RSS de portais, reescreve com Claude e publica no WordPress",
   "type": "module",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dry": "DRY_RUN=1 node src/index.js"
+    "start": "node index.js",
+    "dry": "DRY_RUN=1 node index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
-    "firebase-admin": "^12.7.0",
+    "firebase-admin": "^12.0.0",
     "rss-parser": "^3.13.0"
-  },
-  "engines": {
-    "node": ">=20"
   }
 }

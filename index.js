@@ -54,22 +54,23 @@ async function main() {
 
       try {
         const rewritten = await rewriteWithClaude(item, feed.source);
-        console.log(`  reescrito: ${rewritten.titulo}`);
+        console.log(` reescrito: ${rewritten.titulo}`);
 
         if (DRY_RUN) {
-          console.log('  [DRY RUN] sem publicar');
+          console.log(' [DRY RUN] sem publicar');
           console.log(JSON.stringify(rewritten, null, 2));
+          await markProcessed(guid, feed.source, 'dry-run');
           continue;
         }
 
         const post = await publishToWordPress(rewritten, item, feed.source);
         await markProcessed(guid, feed.source, 'publicado', post.id);
-        console.log(`  publicado, ID ${post.id}, ${post.link}`);
+        console.log(` publicado, ID ${post.id}, ${post.link}`);
         publishedCount++;
 
         await sleep(3000);
       } catch (err) {
-        console.error(`  erro:`, err.message);
+        console.error(` erro:`, err.message);
         await markProcessed(guid, feed.source, 'erro');
       }
     }

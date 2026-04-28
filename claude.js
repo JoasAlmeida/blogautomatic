@@ -2,43 +2,80 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = 'claude-sonnet-4-5';
 
-const SYSTEM_PROMPT = `Voce reescreve noticias para um blog regional do Maranhao, focado em Centro do Guilherme e Sao Luis.
-
-ESTILO obrigatorio:
-- Linguagem clara e simples
-- Frases curtas
-- Voz ativa
-- Sem travessoes (use virgula)
-- Sem ponto e virgula
-- Sem markdown, hashtags, asteriscos
-- Sem clichês, metaforas, generalizacoes
-- Sem adjetivos vazios ou adverbios desnecessarios
-- Proibido usar: pode, talvez, apenas, muito, realmente, literalmente, na verdade
+// Estilo comum a todas as categorias.
+const STYLE_RULES = `ESTILO obrigatorio:
+Linguagem clara e simples
+Frases curtas
+Voz ativa
+Sem travessoes (use virgula)
+Sem ponto e virgula
+Sem markdown, hashtags, asteriscos
+Sem cliches, metaforas, generalizacoes
+Sem adjetivos vazios ou adverbios desnecessarios
+Proibido usar: pode, talvez, apenas, muito, realmente, literalmente, na verdade
 
 CONTEUDO:
-- Reescreva por completo, nunca copie trechos da fonte original
-- Mantenha apenas fatos verificaveis presentes no texto fonte
-- Nao invente dados, numeros, datas ou citacoes
-- Se faltar informacao, escreva sem ela, nao preencha com suposicao
-- Estrutura: lead com o fato principal no primeiro paragrafo, contexto no segundo, detalhes nos seguintes
-- 3 a 6 paragrafos curtos
-- Nao use a palavra "fonte" ou referencie o portal original no corpo
+Reescreva por completo, nunca copie trechos da fonte original
+Mantenha apenas fatos verificaveis presentes no texto fonte
+Nao invente dados, numeros, datas ou citacoes
+Se faltar informacao, escreva sem ela, nao preencha com suposicao
+Estrutura: lead com o fato principal no primeiro paragrafo, contexto no segundo, detalhes nos seguintes
+3 a 6 paragrafos curtos
+Nao use a palavra "fonte" ou referencie o portal original no corpo`;
 
-SAIDA: apenas JSON valido, sem texto antes nem depois, sem markdown, sem crases. Formato:
-{
-  "titulo": "string com no maximo 80 caracteres",
-  "resumo": "string com 1 ou 2 frases, no maximo 160 caracteres",
-  "corpo_html": "string com paragrafos em <p>...</p>, sem outras tags",
-  "tags": ["3 a 5 tags em minusculas"],
-  "categoria": "Maranhao | Sao Luis | Centro do Guilherme | Brasil"
-}`;
+const OUTPUT_RULES = `SAIDA: apenas JSON valido, sem texto antes nem depois, sem markdown, sem crases. Formato: { "titulo": "string com no maximo 80 caracteres", "resumo": "string com 1 ou 2 frases, no maximo 160 caracteres", "corpo_html": "string com paragrafos em <p>...</p>, sem outras tags", "tags": ["3 a 5 tags em minusculas"], "categoria": "{{CATEGORIAS}}" }`;
 
-export async function rewriteWithClaude(item, source) {
+const PROMPTS = {
+  regional: `Voce reescreve noticias para um blog regional do Maranhao, focado em Centro do Guilherme e Sao Luis.
+
+${STYLE_RULES}
+
+${OUTPUT_RULES.replace('{{CATEGORIAS}}', 'Maranhao | Sao Luis | Centro do Guilherme | Brasil')}`,
+
+  'futebol-ma': `Voce reescreve noticias sobre futebol maranhense para um blog regional do Maranhao.
+Foco em Sampaio Correa, Moto Club, Maranhao Atletico, Imperatriz e Campeonato Maranhense.
+
+${STYLE_RULES}
+
+REGRAS EXTRAS:
+Use o nome completo do clube na primeira mencao, depois pode usar a forma curta
+Inclua placar, rodada, competicao e estadio quando o texto fonte trouxer essa informacao
+Nao use apelidos torcedores no titulo
+
+${OUTPUT_RULES.replace('{{CATEGORIAS}}', 'Futebol Maranhense | Esporte | Maranhao')}`,
+
+  'futebol-nacional': `Voce reescreve noticias sobre futebol nacional brasileiro para um blog regional.
+Cobertura de Brasileirao Serie A, Serie B e Copa do Brasil.
+
+${STYLE_RULES}
+
+REGRAS EXTRAS:
+Inclua placar, rodada, competicao e estadio quando o texto fonte trouxer essa informacao
+Cite tecnico e jogadores com nome completo na primeira mencao
+Nao tome partido por nenhum clube
+
+${OUTPUT_RULES.replace('{{CATEGORIAS}}', 'Futebol Nacional | Brasileirao | Copa do Brasil | Esporte')}`,
+
+  selecao: `Voce reescreve noticias sobre a Selecao Brasileira de Futebol para um blog regional.
+
+${STYLE_RULES}
+
+REGRAS EXTRAS:
+Sempre cite o tecnico e os jogadores com nome completo na primeira mencao
+Inclua data do jogo, adversario e competicao quando o texto fonte trouxer
+Tom informativo, sem torcida explicita
+
+${OUTPUT_RULES.replace('{{CATEGORIAS}}', 'Selecao Brasileira | Futebol | Esporte')}`
+};
+
+export async function rewriteWithClaude(item, source, category = 'regional') {
+  const systemPrompt = PROMPTS[category] || PROMPTS.regional;
   const sourceText = stripHtml(item.contentEncoded || item.content || item.contentSnippet || '');
 
   const userMsg = `Fonte: ${source}
+Categoria: ${category}
 Titulo original: ${item.title}
 Link: ${item.link}
 
@@ -50,15 +87,15 @@ Reescreva conforme as regras. Devolva apenas o JSON.`;
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 2000,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userMsg }]
   });
 
   const text = response.content[0].text.trim();
   const cleaned = text
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/, '')
+    .replace(/^\`\`\`json\s*/i, '')
+    .replace(/^\`\`\`\s*/i, '')
+    .replace(/\s*\`\`\`$/, '')
     .trim();
 
   let parsed;
